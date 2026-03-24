@@ -42,6 +42,8 @@ aws-architect-agent/
 ├── .env                       # Vos secrets (ne pas committer)
 ├── Makefile                   # Commandes courantes
 ├── .sources/                  # Fichiers MD de référence (injectés dans les prompts)
+│   ├── standards_iac_terraform.md   # Standards IaC Terraform de l'entreprise
+│   └── standards_python.md          # Standards Python de l'entreprise
 ├── repo/                      # Repo Git local cloné (monté dans strands-agent)
 └── agent/
     ├── Dockerfile             # Image strands-agent (à builder)
@@ -81,6 +83,38 @@ MODEL_ARCHITECT=<nom-modele>
 # Redémarrer strands-agent (pas de rebuild nécessaire)
 docker compose restart strands-agent
 ```
+
+## Standards d'entreprise (injection de contexte)
+
+L'agent injecte automatiquement vos standards d'entreprise dans les prompts des agents concernés via le répertoire `.sources/`. Pas besoin de créer des skills dédiés.
+
+### Convention de nommage des fichiers
+
+| Préfixe de fichier          | Agent(s) ciblé(s)                         |
+|-----------------------------|-------------------------------------------|
+| `standards_iac_*.md`        | Agent IaC (génération Terraform/HCL)      |
+| `standards_python*.md`      | Agent IaC (génération code Python)        |
+| Tout autre fichier `.md`    | Agent architecte (conception DDD)         |
+
+### Exemples fournis
+
+- `.sources/standards_iac_terraform.md` — structure des modules, nommage, tags obligatoires, sécurité IAM, chiffrement, gestion du state, versions, CI/CD
+- `.sources/standards_python.md` — version Python, style (ruff), structure projet, handlers Lambda, logging, tests, sécurité
+
+### Ajouter vos propres standards
+
+```bash
+# Créer un fichier de standards IaC spécifique à votre organisation
+cat > .sources/standards_iac_naming.md << 'EOF'
+# Convention de nommage interne
+...
+EOF
+
+# Redémarrer l'agent (aucun rebuild nécessaire, les fichiers sont montés en volume)
+docker compose restart strands-agent
+```
+
+Les fichiers sont montés en lecture seule dans le conteneur (`/app/sources`) et rechargés à chaque appel d'agent.
 
 ## Commandes utiles
 

@@ -41,12 +41,28 @@ def get_model(agent_name: str) -> OpenAIModel:
 
 # ─── SOURCES LOCALES (pattern injection directe anti-hallucination) ──────────
 
-def load_local_sources(directory: str = "/app/sources", max_per_file: int = 2000) -> str:
+def load_local_sources(
+    directory: str = "/app/sources",
+    prefix: str = "",
+    max_per_file: int = 2000,
+) -> str:
+    """Charge les fichiers Markdown depuis *directory*.
+
+    Args:
+        directory: chemin du répertoire à lire.
+        prefix: si fourni, ne charge que les fichiers dont le nom commence par ce préfixe.
+        max_per_file: nombre maximal de caractères lus par fichier.
+
+    Returns:
+        Contenu concaténé des fichiers trouvés, ou chaîne vide si le répertoire n'existe pas.
+    """
     results = []
     source_dir = Path(directory)
     if not source_dir.exists():
         return ""
     for md_file in sorted(source_dir.glob("**/*.md")):
+        if prefix and not md_file.name.startswith(prefix):
+            continue
         content = md_file.read_text(encoding="utf-8")
         results.append(f"=== {md_file.name} ===\n{content[:max_per_file]}\n")
     return "\n".join(results)
@@ -111,14 +127,25 @@ async def run_iac_agent(architecture: str) -> str:
     """
     Agent 2 — Génère l'IaC Terraform et le code Python 3.13+.
     Outils : Terraform MCP (registry + syntaxe HCL), AWS Knowledge MCP.
+    Les standards d'entreprise sont injectés depuis /app/sources (fichiers standards_iac_* et standards_python_*).
     """
+    iac_standards = load_local_sources(prefix="standards_iac_")
+    python_standards = load_local_sources(prefix="standards_python")
+    standards_block = ""
+    if iac_standards:
+        standards_block += f"\nSTANDARDS IaC ENTREPRISE :\n{iac_standards}"
+    if python_standards:
+        standards_block += f"\nSTANDARDS PYTHON ENTREPRISE :\n{python_standards}"
+
     with make_terraform_mcp() as tf_tools, make_knowledge_mcp() as knowledge_tools:
         agent = Agent(
             model=get_model("iac_agent"),
-            system_prompt="""Tu es un expert Terraform et Python 3.13+.
+            system_prompt=f"""Tu es un expert Terraform et Python 3.13+.
 Tu génères du HCL propre, validé et sécurisé (least privilege IAM, chiffrement par défaut).
 Tu utilises toujours les dernières versions des providers AWS.
-Tu ajoutes des outputs Terraform utiles et des variables paramétrables.""",
+Tu ajoutes des outputs Terraform utiles et des variables paramétrables.
+{standards_block}
+RÈGLE ABSOLUE : respecte scrupuleusement les standards ci-dessus pour tout le code généré.""",
             tools=[
                 *tf_tools.list_tools_sync(),
                 *knowledge_tools.list_tools_sync(),

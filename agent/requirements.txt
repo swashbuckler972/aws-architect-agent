@@ -1,0 +1,27 @@
+# ─── Framework agent ────────────────────────────────────────────────────────
+strands-agents>=0.1.0
+strands-agents-tools>=0.1.0
+
+# ─── LLM provider (API OpenAI-compatible → Ollama) ──────────────────────────
+openai>=1.35.0
+
+# ─── MCP client (pour Terraform MCP, LocalStack MCP, AWS Knowledge MCP) ────
+mcp>=1.0.0
+fastmcp>=0.1.0           # proxy stdio → HTTP pour AWS Knowledge MCP
+
+# ─── Git / GitHub (@tool custom Python) ─────────────────────────────────────
+gitpython>=3.1.40
+PyGitHub>=2.3.0
+
+# ─── AWS (strands_tools AWS natif + boto3 pour LocalStack) ──────────────────
+boto3>=1.34.0
+botocore>=1.34.0
+
+# ─── Recherche web (injection directe anti-hallucination) ───────────────────
+duckduckgo-search>=6.3.7
+
+# ─── Utilitaires ────────────────────────────────────────────────────────────
+python-dotenv>=1.0.0
+pydantic>=2.7.0
+setuptools>=69.0.0
+httpx>=0.27.0            # client HTTP async pour les healthchecks

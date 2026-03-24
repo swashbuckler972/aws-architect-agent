@@ -1,0 +1,116 @@
+services:
+
+  # ─── 1. LLM LOCAL ──────────────────────────────────────────────────────────
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    networks:
+      - agent-network
+
+  # ─── 2. INTERFACE WEB ──────────────────────────────────────────────────────
+  open-webui:
+    image: ghcr.io/open-webui/open-webui:main
+    container_name: open-webui
+    restart: unless-stopped
+    ports:
+      - "3000:8080"
+    environment:
+      - OLLAMA_BASE_URL=http://ollama:11434
+      - WEBUI_AUTH=false
+    volumes:
+      - webui_data:/app/backend/data
+    depends_on:
+      ollama:
+        condition: service_healthy
+    networks:
+      - agent-network
+
+  # ─── 3. AGENT STRANDS ──────────────────────────────────────────────────────
+  strands-agent:
+    build:
+      context: ./agent
+      dockerfile: Dockerfile
+    container_name: strands-agent
+    restart: unless-stopped
+    environment:
+      # LLM
+      - OLLAMA_BASE_URL=http://ollama:11434
+      # Modèles — modifier ici pour changer sans rebuilder
+      - MODEL_ARCHITECT=${MODEL_ARCHITECT:-minimax-m2.7:cloud}
+      - MODEL_IAC=${MODEL_IAC:-devstral-small-2:24b-cloud}
+      - MODEL_REPORT=${MODEL_REPORT:-devstral-small-2:24b-cloud}
+      - MODEL_EXECUTOR=${MODEL_EXECUTOR:-devstral-small-2:24b-cloud}
+      # GitHub
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+      - GITHUB_REPO=${GITHUB_REPO}
+      # AWS (pour strands_tools AWS natif)
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-test}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-test}
+      - AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION:-eu-west-1}
+      # LocalStack
+      - LOCALSTACK_URL=http://localstack:4566
+      # Agent
+      - CREWAI_TRACING_ENABLED=false
+      - USER_CONTEXT=${USER_CONTEXT:-}
+    volumes:
+      # Sources locales de référence
+      - ./.sources:/app/sources:ro
+      # Repo Git local cloné
+      - ./repo:/app/repo
+      # Accès Docker hôte pour le sandbox
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Cache pip inter-restarts
+      - pip_cache:/root/.cache/pip
+    depends_on:
+      ollama:
+        condition: service_healthy
+      localstack:
+        condition: service_healthy
+    networks:
+      - agent-network
+
+  # ─── 4. LOCALSTACK ─────────────────────────────────────────────────────────
+  localstack:
+    image: localstack/localstack:latest
+    container_name: localstack
+    restart: unless-stopped
+    ports:
+      - "4566:4566"
+    environment:
+      - SERVICES=${LOCALSTACK_SERVICES:-s3,iam,lambda,dynamodb,ec2,sts,cloudformation}
+      - DEBUG=${LOCALSTACK_DEBUG:-0}
+      - LOCALSTACK_AUTH_TOKEN=${LOCALSTACK_AUTH_TOKEN:-}
+    volumes:
+      - localstack_data:/var/lib/localstack
+      - /var/run/docker.sock:/var/run/docker.sock
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4566/_localstack/health"]
+      interval: 20s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+    networks:
+      - agent-network
+
+# ─── VOLUMES ───────────────────────────────────────────────────────────────
+volumes:
+  ollama_data:
+  webui_data:
+  localstack_data:
+  pip_cache:
+
+# ─── RÉSEAU ────────────────────────────────────────────────────────────────
+networks:
+  agent-network:
+    driver: bridge

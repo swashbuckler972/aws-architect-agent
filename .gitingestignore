@@ -1,0 +1,22 @@
+# Secrets
+.env
+
+# Données locales
+repo/
+output/
+.sources/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+dist/
+
+# Docker volumes (ne pas committer les données persistées)
+volumes/
+
+# IDE
+.vscode/
+.idea/
+*.swp
